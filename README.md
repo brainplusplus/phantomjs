@@ -49,6 +49,36 @@ func main() {
 }
 ```
 
+
+### Starting the process using proxy and additional arguments
+
+This wrapper works by communicating with a separate `phantomjs` process over
+HTTP using proxy and additional arguments. The process can take several seconds to start up and shut down so you
+should do that once and then share the process. There is a package-level
+variable called `phantomjs.DefaultProcess` that exists for this purpose.
+
+```go
+package main
+
+import (
+	"github.com/benbjohnson/phantomjs"
+)
+
+func main() {
+	// Start the process once.
+	phantomjs.DefaultProcess = phantomjs.NewProcessUsingProxy("196.18.xxx.xxx:44","http","user:pass")
+	phantomjs.AdditionalArgs = "--debug=true"
+	if err := phantomjs.DefaultProcess.Open(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer phantomjs.DefaultProcess.Close()
+
+	// Do other stuff in your program.
+	doStuff()
+}
+```
+
 You can have multiple processes, however, you will need to change the port used
 for each one so they do not conflict. This library uses port `20202` by default.
 
