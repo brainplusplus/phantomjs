@@ -37,6 +37,7 @@ const (
 // Process represents a PhantomJS process.
 type Process struct {
 	path string
+	AdditionalPath string
 	cmd  *exec.Cmd
 
 	// Path to the 'phantomjs' binary.
@@ -48,6 +49,12 @@ type Process struct {
 	// Output from the process.
 	Stdout io.Writer
 	Stderr io.Writer
+
+	Proxy string
+	ProxyType string
+	ProxyAuth string
+
+	AdditionalArgs string
 }
 
 // NewProcess returns a new instance of Process.
@@ -60,6 +67,18 @@ func NewProcess() *Process {
 	}
 }
 
+func NewProcessUsingProxy(proxy string,proxyType string,proxyAuth string) *Process {
+	return &Process{
+		BinPath: DefaultBinPath,
+		Port:    DefaultPort,
+		Stdout:  os.Stdout,
+		Stderr:  os.Stderr,
+		Proxy: proxy,
+		ProxyType: proxyType,
+		ProxyAuth: proxyAuth,
+	}
+}
+
 // Path returns a temporary path that the process is run from.
 func (p *Process) Path() string {
 	return p.path
@@ -69,7 +88,10 @@ func (p *Process) Path() string {
 func (p *Process) Open() error {
 	if err := func() error {
 		// Generate temporary path to run script from.
-		path, err := ioutil.TempDir("", "phantomjs-")
+		if p.AdditionalPath != "" && p.AdditionalPath != "-" {
+			p.AdditionalPath = p.AdditionalPath + "-"
+		}
+		path, err := ioutil.TempDir("", "phantomjs-"+p.AdditionalPath)
 		if err != nil {
 			return err
 		}
@@ -81,8 +103,27 @@ func (p *Process) Open() error {
 			return err
 		}
 
+		proxy := ""
+		proxyType := ""
+		proxyAuth := ""
+
+		if p.Proxy != "" {
+			proxy = "--proxy="+p.Proxy
+
+			if p.ProxyType == "" {
+				p.ProxyType = "http"
+			}
+			proxyType = "--proxy-type="+p.ProxyType
+
+			if p.ProxyAuth != "" {
+				proxyAuth = "--proxy-auth="+p.ProxyAuth
+			}
+		}
+
+
+
 		// Start external process.
-		cmd := exec.Command(p.BinPath, scriptPath)
+		cmd := exec.Command(p.BinPath,proxy,proxyType,proxyAuth,p.AdditionalArgs, scriptPath)
 		cmd.Env = []string{fmt.Sprintf("PORT=%d", p.Port)}
 		cmd.Stdout = p.Stdout
 		cmd.Stderr = p.Stderr
@@ -95,6 +136,7 @@ func (p *Process) Open() error {
 		if err := p.wait(); err != nil {
 			return err
 		}
+		fmt.Println(p.cmd.Args)
 		return nil
 
 	}(); err != nil {
